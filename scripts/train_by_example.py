@@ -18,8 +18,6 @@ import os
 
 torch.autograd.set_detect_anomaly(True)
 
-
-
 def to_cuda(features):
     
     for feature in features:
@@ -74,13 +72,28 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
 
     elif dataset_type == "MD":
         
-        dataset = MDDataset(mode="train", model=model_type)
-        
+        dataset = MDDataset(mode="train", 
+                            data_path=data_path, # aim to take the data_path from argparse.
+                            data_dir=data_path, 
+                            model=model_type) 
+#        dataset = MDDataset(mode="train", model=model_type)
+        print(f"DBG 80: ndata = {len(dataset)}")
+           
         validation_dataset = MDDataset(mode="val", model=model_type)
         
         collate_fn = collate_multiple_coords        
+        
+#        print(f"DBG 83: dataset dir  (npy)  {dataset.data_dir}")
+        print(f"DBG 84: dataset path (pdb) = {dataset.data_path}")
+
+
+    # 2023.12.19 
+    # Shinji added this. If this isn't put here, `dataset`(See above, as an example) isn't assigned before calling it.(so an error raises)
+    else:
+        assert dataset_type in ["MD", "fragment"], f"Invalid dataset type => {dataset_type}"
     
-    
+
+
     if weighted:
         
         sampler = get_weighted_sampler("train")
@@ -96,13 +109,16 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
                                              sampler=sampler)
         
     else:
+        batch_size = 8 # @@@hard-coded!!!!
+        print(f"DBG: hardcoded batch size = {batch_size}")
         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
                                              num_workers=4, collate_fn=collate_fn,
                                              shuffle=True)
-        
-        validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
-                                             num_workers=4, collate_fn=collate_fn,
-                                             shuffle=True)
+
+        # NOTE: Validation is off @30.12.2023       
+        # validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
+        #                                      num_workers=4, collate_fn=collate_fn,
+        #                                      shuffle=True)
 
     start_time = time()
 
@@ -111,6 +127,9 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
     validation_losses = []
 
     iters = len(loader)
+    
+#    assert iters == round(len(dataset) / batch_size), f"{iters} != {round(len(dataset) / batch_size)}, which is not expected."
+    print(f"DBG: iter {iters} == {round(len(dataset) / batch_size)}")
 
     for e in range(epochs):
 
@@ -119,7 +138,7 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
         
         
         for value, features in enumerate(loader):
-
+            #print(f"DBG 126: value(iter)={value}, features.keys={features.keys()}")
             if features == None:
                 continue
 
@@ -189,7 +208,9 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
 
                 losses = []
                 
-
+            continue # to inactivate validation loss calculation
+        
+            # @@@ Validation
             if (value+1) % 10000 == 0 or (value == iters - 1):
                 model.eval()
                 
@@ -276,7 +297,7 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
                 
                 print(log)
                 
-                if (value+1) % 100000 == 0:
+                if (value+1) % 1000 == 0:
                     if not os.path.isdir("checkpoints_" + model_type):
                         os.mkdir("checkpoints_" + model_type)
                         
@@ -293,6 +314,15 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
                 sys.stdout.flush()
                 model.train()
 
+        # @@@ Save model parameters at each epoch
+        param_dict = {"model_state_dict": model.state_dict(),
+                      "optimizer_state_dict":optimizer.state_dict()
+                     }                             
+        if ema_decay != None:
+            param_dict["ema_state_dict"] = ema.state_dict()
+        print(f"Saving model at epoch {e}")
+        torch.save(param_dict, output_file)
+        print("Saved model successfully!")
 
 if __name__ == "__main__":
 
@@ -349,8 +379,11 @@ if __name__ == "__main__":
         print("The number of parameters in the hypernetwork is %i" 
               %(sum(p.numel()for p in model.hypernetwork.parameters() if p.requires_grad)))   
   
-        if args.dataset == "md":
+        # NOTE: Original implementation does not go through this if-statement even if args.dataset == 'MD', which is expected in the line 75-ish 
+        if args.dataset.lower() == "md":   
+        #if args.dataset == "md": 
             config.training = config.finetuning_md
+            print("Batch size of config.training: ", config.training.batch_size)
     sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
                                 beta_max=config.sde_config.beta_max)
     
@@ -361,7 +394,10 @@ if __name__ == "__main__":
     
 
     model.cuda()
-        
+    
+    # Shinji Added: 
+    print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
+
     if args.use_saved:
         train(model, args.model, args.epochs, args.output_file, 
               config.training.batch_size, config.training.lr, sde, 
@@ -369,7 +405,8 @@ if __name__ == "__main__":
               saved_params=args.saved_model, data_path=args.data_path, weighted=args.weighted,
               dataset_type=args.dataset)
     else:
-
+        print("DBG: Batch size: ", config.training.batch_size)
+        print("DBG: data_path: ", args.data_path)
         train(model, args.model, args.epochs, args.output_file, config.training.batch_size,
               config.training.lr, sde, ema_decay=config.training.ema, gradient_clip=config.training.gradient_clip,
               data_path=args.data_path, weighted=args.weighted, dataset_type=args.dataset)
