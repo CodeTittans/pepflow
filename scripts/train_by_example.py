@@ -49,51 +49,16 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
             
             ema.load_state_dict(torch.load(saved_params)["ema_state_dict"])
     
+    # ----
+    dataset = MDDataset(mode="train", 
+                        data_path=data_path, # aim to take the data_path from argparse.
+                        data_dir=data_path, 
+                        model=model_type) 
+       
+    validation_dataset = MDDataset(mode="val", model=model_type)
     
-    if dataset_type == "fragment":
-        if model_type == "rotamer":
-            dataset = FragmentDatasetRotamer(mode="train", data_path=data_path)
-        
-            validation_dataset = FragmentDatasetRotamer(mode="val",  data_path=data_path)
-            
-        elif model_type == "protonation":
-            dataset = FragmentDatasetHydrogen(mode="train", data_path=data_path)
-                                                
-        
-            validation_dataset = FragmentDatasetHydrogen(mode="val", data_path=data_path)
-                                                
-        elif model_type == "backbone":
-            dataset = FragmentDatasetBackbone(mode="train", data_path=data_path, full=weighted)
-                                                 
-        
-            validation_dataset = FragmentDatasetBackbone(mode="val", data_path=data_path, full=weighted)
+    collate_fn = collate_multiple_coords        
     
-        collate_fn = collate
-
-    elif dataset_type == "MD":
-        
-        dataset = MDDataset(mode="train", 
-                            data_path=data_path, # aim to take the data_path from argparse.
-                            data_dir=data_path, 
-                            model=model_type) 
-#        dataset = MDDataset(mode="train", model=model_type)
-        print(f"DBG 80: ndata = {len(dataset)}")
-           
-        validation_dataset = MDDataset(mode="val", model=model_type)
-        
-        collate_fn = collate_multiple_coords        
-        
-#        print(f"DBG 83: dataset dir  (npy)  {dataset.data_dir}")
-        print(f"DBG 84: dataset path (pdb) = {dataset.data_path}")
-
-
-    # 2023.12.19 
-    # Shinji added this. If this isn't put here, `dataset`(See above, as an example) isn't assigned before calling it.(so an error raises)
-    else:
-        assert dataset_type in ["MD", "fragment"], f"Invalid dataset type => {dataset_type}"
-    
-
-
     if weighted:
         
         sampler = get_weighted_sampler("train")
