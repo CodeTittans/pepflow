@@ -314,11 +314,9 @@ if __name__ == "__main__":
         print("The number of parameters in the hypernetwork is %i" 
               %(sum(p.numel()for p in model.hypernetwork.parameters() if p.requires_grad)))   
   
-        # NOTE: Original implementation does not go through this if-statement even if args.dataset == 'MD', which is expected in the line 75-ish 
-        if args.dataset.lower() == "md":   
-        #if args.dataset == "md": 
-            config.training = config.finetuning_md
-            print("Batch size of config.training: ", config.training.batch_size)
+
+        config.training = config.finetuning_md
+        print("Batch size of config.training: ", config.training.batch_size)
     sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
                                 beta_max=config.sde_config.beta_max)
     
