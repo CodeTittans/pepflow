@@ -4,7 +4,7 @@ from pepflow.model.model_configs import config_rotamer, config_hydrogen,\
     config_backbone_bert, config_backbone
 from pepflow.model.ema import ExponentialMovingAverage
 from pepflow.data.dataset import FragmentDatasetRotamer, FragmentDatasetHydrogen,\
-    FragmentDatasetBackbone, MDDataset, get_weighted_sampler
+    FragmentDatasetBackbone, MDDataset
 from pepflow.utils.dataset_utils import collate, collate_multiple_coords
 from pepflow.utils.training_utils import sample_centered_noise,\
     sample_noise, dsm
@@ -293,10 +293,6 @@ if __name__ == "__main__":
     parser.add_argument("-dt", dest="dataset", type=str, 
                         help="Dataset to train on MD",
                         required=False, default="MD")
-    parser.add_argument("--w", dest="weighted", required=False,
-                        action="store_true")
-
-
     
     args = parser.parse_args()
 
