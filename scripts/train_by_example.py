@@ -29,7 +29,7 @@ def to_cuda(features):
     
     return features
 
-def load_dataset(path_to_seqs, path_to_mdtraj, model_type, weighted, batch_size = 8):
+def load_dataset(path_to_seqs, path_to_mdtraj, model_type, batch_size = 8):
 
     dataset = MDDataset(mode="train", 
                         data_path=path_to_mdtraj, # aim to take the data_path from argparse.
@@ -38,29 +38,13 @@ def load_dataset(path_to_seqs, path_to_mdtraj, model_type, weighted, batch_size 
     validation_dataset = MDDataset(mode="val", model=model_type)    
 
     collate_fn = collate_multiple_coords        
+    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
+                                         num_workers=4, collate_fn=collate_fn,
+                                         shuffle=True)
 
-    if weighted:
-        
-        sampler = get_weighted_sampler("train")
-        
-        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
-                                             num_workers=4, collate_fn=collate_fn,
-                                             sampler=sampler)
-        
-        sampler = get_weighted_sampler("val")
-        
-        validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
-                                             num_workers=4, collate_fn=collate_fn,
-                                             sampler=sampler)
-        
-    else:
-        loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
-                                             num_workers=4, collate_fn=collate_fn,
-                                             shuffle=True)
-
-        validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
-                                             num_workers=4, collate_fn=collate_fn,
-                                             shuffle=True)
+    validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
+                                                    num_workers=4, collate_fn=collate_fn,
+                                                    shuffle=True)
     return loader, validation_loader
 
 def train(model, train_loader, validation_loader, model_type,
@@ -363,15 +347,16 @@ if __name__ == "__main__":
     train_loader, validation_loader = load_dataset(path_to_seqs='../datasets/', 
                                                    path_to_mdtraj='../md_pdbs', 
                                                    model_type=args.model, 
-                                                   weighted=args.weighted, 
-                                                   batch_size = 8)    
+                                                   batch_size = config.training.batch_size)    
 
     if args.use_saved:
-        train(model, args.model, args.epochs, args.output_file, 
-              config.training.batch_size, config.training.lr, sde, 
-              ema_decay=config.training.ema, gradient_clip=config.training.gradient_clip,
-              saved_params=args.saved_model, data_path=args.data_path, weighted=args.weighted,
-              dataset_type=args.dataset)
+        train(model, train_loader, validation_loader, args.model, 
+              args.epochs, args.output_file, config.training.batch_size,
+              config.training.lr, 
+              sde, 
+              ema_decay=config.training.ema, 
+              saved_params=args.saved_model,
+              gradient_clip=config.training.gradient_clip)
     else:
         print("DBG: Batch size: ", config.training.batch_size)
         print("DBG: data_path: ", args.data_path)
