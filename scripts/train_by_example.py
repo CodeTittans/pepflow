@@ -29,36 +29,16 @@ def to_cuda(features):
     
     return features
 
+def load_dataset(path_to_seqs, path_to_mdtraj, model_type, weighted, batch_size = 8):
 
-
-def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay, 
-          gradient_clip = None, eps=1e-5, saved_params=None, data_path="./", weighted=False,
-          dataset_type="fragment"):
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    
-    if not saved_params == None:
-
-        optimizer.load_state_dict(torch.load(saved_params)["optimizer_state_dict"])
-        
-    if ema_decay != None:
-        
-        ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
-        
-        if saved_params != None:
-            
-            ema.load_state_dict(torch.load(saved_params)["ema_state_dict"])
-    
-    # ----
     dataset = MDDataset(mode="train", 
-                        data_path=data_path, # aim to take the data_path from argparse.
-                        data_dir=data_path, 
+                        data_path=path_to_mdtraj, # aim to take the data_path from argparse.
+                        data_dir=path_to_seqs,  # Path to dataset saved as .npy storing AA seqs., 
                         model=model_type) 
-       
-    validation_dataset = MDDataset(mode="val", model=model_type)
-    
+    validation_dataset = MDDataset(mode="val", model=model_type)    
+
     collate_fn = collate_multiple_coords        
-    
+
     if weighted:
         
         sampler = get_weighted_sampler("train")
@@ -74,27 +54,43 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
                                              sampler=sampler)
         
     else:
-        batch_size = 8 # @@@hard-coded!!!!
-        print(f"DBG: hardcoded batch size = {batch_size}")
         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
                                              num_workers=4, collate_fn=collate_fn,
                                              shuffle=True)
 
-        # NOTE: Validation is off @30.12.2023       
-        # validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
-        #                                      num_workers=4, collate_fn=collate_fn,
-        #                                      shuffle=True)
+        validation_loader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, 
+                                             num_workers=4, collate_fn=collate_fn,
+                                             shuffle=True)
+    return loader, validation_loader
 
+def train(model, train_loader, validation_loader, model_type,
+          epochs, output_file, batch_size, lr, sde, ema_decay, 
+          gradient_clip = None, eps=1e-5, saved_params=None):
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    
+    if not saved_params == None:
+
+        optimizer.load_state_dict(torch.load(saved_params)["optimizer_state_dict"])
+        
+    if ema_decay != None:
+        
+        ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
+        
+        if saved_params != None:
+            
+            ema.load_state_dict(torch.load(saved_params)["ema_state_dict"])
+    
     start_time = time()
 
     log_step = 100
     
     validation_losses = []
 
-    iters = len(loader)
+    iters = len(train_loader)
     
 #    assert iters == round(len(dataset) / batch_size), f"{iters} != {round(len(dataset) / batch_size)}, which is not expected."
-    print(f"DBG: iter {iters} == {round(len(dataset) / batch_size)}")
+    print(f"DBG: iter {iters} == {round(len(train_loader) / batch_size)}")
 
     for e in range(epochs):
 
@@ -102,7 +98,7 @@ def train(model, model_type, epochs, output_file, batch_size, lr, sde, ema_decay
         losses = []
         
         
-        for value, features in enumerate(loader):
+        for value, features in enumerate(train_loader):
             #print(f"DBG 126: value(iter)={value}, features.keys={features.keys()}")
             if features == None:
                 continue
@@ -300,8 +296,8 @@ if __name__ == "__main__":
     parser.add_argument("-o", dest="output_file",
                         help="File for output of model parameters", required=True, type=str)
     parser.add_argument("-d", dest="data_path",
-                        help="Directory where data is stored", required=False, 
-                        type=str, default="./")
+                        help="Directory where data is stored", required=True, 
+                        type=str)
     parser.add_argument("-ep", dest="epochs", help="Number of epochs",
                         required=False, type=int, default=10)
     parser.add_argument("-m", dest="model", type=str, 
@@ -311,8 +307,8 @@ if __name__ == "__main__":
                         help="Type of hypernetwork to use, either bert or resnet",
                         required=False, default=None)
     parser.add_argument("-dt", dest="dataset", type=str, 
-                        help="Dataset to train on, fragment or MD",
-                        required=False, default="fragment")
+                        help="Dataset to train on MD",
+                        required=False, default="MD")
     parser.add_argument("--w", dest="weighted", required=False,
                         action="store_true")
 
@@ -363,6 +359,13 @@ if __name__ == "__main__":
     # Shinji Added: 
     print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
 
+    # Load datasets
+    train_loader, validation_loader = load_dataset(path_to_seqs='../datasets/', 
+                                                   path_to_mdtraj='../md_pdbs', 
+                                                   model_type=args.model, 
+                                                   weighted=args.weighted, 
+                                                   batch_size = 8)    
+
     if args.use_saved:
         train(model, args.model, args.epochs, args.output_file, 
               config.training.batch_size, config.training.lr, sde, 
@@ -372,6 +375,9 @@ if __name__ == "__main__":
     else:
         print("DBG: Batch size: ", config.training.batch_size)
         print("DBG: data_path: ", args.data_path)
-        train(model, args.model, args.epochs, args.output_file, config.training.batch_size,
-              config.training.lr, sde, ema_decay=config.training.ema, gradient_clip=config.training.gradient_clip,
-              data_path=args.data_path, weighted=args.weighted, dataset_type=args.dataset)
+        train(model, train_loader, validation_loader, args.model, 
+              args.epochs, args.output_file, config.training.batch_size,
+              config.training.lr, 
+              sde, 
+              ema_decay=config.training.ema, 
+              gradient_clip=config.training.gradient_clip)
