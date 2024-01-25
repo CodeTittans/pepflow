@@ -47,15 +47,9 @@ def load_dataset(path_to_seqs, path_to_mdtraj, model_type, batch_size = 8):
                                                     shuffle=True)
     return loader, validation_loader
 
-def train(model, train_loader, validation_loader, model_type,
-          epochs, output_file, batch_size, lr, sde, ema_decay, 
+def train(model, optimizer, train_loader, validation_loader, model_type,
+          epochs, output_file, batch_size, sde, ema_decay, 
           gradient_clip = None, eps=1e-5, saved_params=None):
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    
-    if not saved_params == None:
-
-        optimizer.load_state_dict(torch.load(saved_params)["optimizer_state_dict"])
         
     if ema_decay != None:
         
@@ -153,7 +147,7 @@ def train(model, train_loader, validation_loader, model_type,
 
                 losses = []
                 
-            continue # to inactivate validation loss calculation
+            #continue # to inactivate validation loss calculation
         
             # @@@ Validation
             if (value+1) % 10000 == 0 or (value == iters - 1):
@@ -332,10 +326,13 @@ if __name__ == "__main__":
 
     if args.use_saved:
         model.load_state_dict(torch.load(args.saved_model)["model_state_dict"])
-    
 
     model.cuda()
-    
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=config.training.lr)
+    if args.use_saved:
+        optimizer.load_state_dict(torch.load(args.saved_model)["optimizer_state_dict"])
+
     # Shinji Added: 
     print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
 
@@ -346,19 +343,16 @@ if __name__ == "__main__":
                                                    batch_size = config.training.batch_size)    
 
     if args.use_saved:
-        train(model, train_loader, validation_loader, args.model, 
+        train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
-              config.training.lr, 
               sde, 
               ema_decay=config.training.ema, 
-              saved_params=args.saved_model,
               gradient_clip=config.training.gradient_clip)
     else:
         print("DBG: Batch size: ", config.training.batch_size)
         print("DBG: data_path: ", args.data_path)
-        train(model, train_loader, validation_loader, args.model, 
+        train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
-              config.training.lr, 
               sde, 
               ema_decay=config.training.ema, 
               gradient_clip=config.training.gradient_clip)
