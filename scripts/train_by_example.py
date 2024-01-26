@@ -278,9 +278,6 @@ if __name__ == "__main__":
                         required=False, type=str, default="Saved.pth")
     parser.add_argument("-o", dest="output_file",
                         help="File for output of model parameters", required=True, type=str)
-    parser.add_argument("-d", dest="data_path",
-                        help="Directory where data is stored", required=True, 
-                        type=str)
     parser.add_argument("-ep", dest="epochs", help="Number of epochs",
                         required=False, type=int, default=10)
     parser.add_argument("-m", dest="model", type=str, 
@@ -362,7 +359,6 @@ if __name__ == "__main__":
               gradient_clip=config.training.gradient_clip)
     else:
         print("DBG: Batch size: ", config.training.batch_size)
-        print("DBG: data_path: ", args.data_path)
         train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
               sde, 
