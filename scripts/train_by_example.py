@@ -311,23 +311,16 @@ if __name__ == "__main__":
     elif args.model == "backbone":
         
         if args.hypernetwork_type == "bert":
-            print('DBG: config is config_backbone_bert')
             config = config_backbone_bert
         elif args.hypernetwork_type == "resnet":
             config = config_backbone
         else:
            raise ValueError("Hypernetwork type argument is invalid, must be one of bert or resnet")
 
-        print("Batch size of config.training (Before1): ", config.training.batch_size, config['training']['batch_size'])
         model = BackboneModel(config)
-        print('DBG: model is this:', model)
         print("The number of parameters in the hypernetwork is %i" 
               %(sum(p.numel()for p in model.hypernetwork.parameters() if p.requires_grad)))   
-  
-        #print("DBG: config.iida", config.iida)
-        #config.training = config.finetuning_md
-        print("Batch size of config.training (After1): ", config.training.batch_size, config['training']['batch_size'])
-
+ 
     sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
                                 beta_max=config.sde_config.beta_max)
     
@@ -358,7 +351,6 @@ if __name__ == "__main__":
               ema_decay=config.training.ema, 
               gradient_clip=config.training.gradient_clip)
     else:
-        print("DBG: Batch size: ", config.training.batch_size)
         train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
               sde, 
