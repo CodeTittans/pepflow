@@ -1359,30 +1359,45 @@ class PeptideTestDataset(Dataset):
     
             
 class MDDataset(Dataset):
+    # 2023.12.21 Shinji renamed:
+    #    data_dir -> data_dir_seq
+    #    data_path-> data_mdpdb_path
+    def __init__(self, 
+                 data_dir_seq, 
+                 data_mdpdb_path, 
+                 mode="train",
+                 pad=True, 
+                 model="backbone", 
+                 num_repeats=100, 
+                 sample_mds=1):
 
-    def __init__(self, mode="train", data_dir="../datasets",
-                 data_path="../md_pdbs/", pad=True, model="backbone", no_mod=False, 
-                 num_repeats=100, sample_mds=1):
-       
+    # def __init__(self, mode="train", data_dir="../datasets",
+    #              data_path="../md_pdbs/", pad=True, model="backbone", no_mod=False, 
+    #              num_repeats=100, sample_mds=1):      
+         
+        # 2023.12.20 Shinji added
+        self.data_dir_seq = data_dir_seq
+
         self.pad = pad
         
-        self.data_path = data_path
+        self.data_mdpdb_path = data_mdpdb_path
         
         self.model = model
         
+        print(f"DBG 1382: self.data_dir_seq={self.data_dir_seq}")
+        print(f"DBG 1383: self.data_mdpdb_path={ self.data_mdpdb_path}")
         
-        if mode == "train" and not no_mod:
-            self.data_list = np.load(os.path.join(data_dir, "train_md_data.npy"))
-        elif mode == "train":
-            self.data_list = np.load(os.path.join(data_dir, "train_md_data_no_mod.npy"))
-        elif mode == "val" and not no_mod:
-            self.data_list = np.load(os.path.join(data_dir, "val_md_data.npy"))
+        
+        if mode == "train":
+            self.data_list = np.load(os.path.join(data_dir_seq, "train_seq2_peptide_070.npy"))
+            #self.data_list = np.load(os.path.join(data_dir_seq, "train_md_data.npy"))
+            #                                                ^ list of sequences like ['AAA', ...]
+
         elif mode == "val":
-            self.data_list = np.load(os.path.join(data_dir, "val_md_data_no_mod.npy"))
-        elif mode == "test" and not no_mod:
-            self.data_list = np.load(os.path.join(data_dir, "test_md_data.npy"))
+            self.data_list = np.load(os.path.join(data_dir_seq, "val_md_data_no_mod.npy"))
+
         elif mode == "test":
-            self.data_list = np.load(os.path.join(data_dir, "test_md_data_no_mod.npy"))
+            self.data_list = np.load(os.path.join(data_dir_seq, "test_md_data_no_mod.npy"))
        
 
         self.mode = mode
@@ -1396,14 +1411,15 @@ class MDDataset(Dataset):
         else:
             ignore_hydrogens = False
         if mode == "train" or mode == "val":
-            self.pipeline = DataPipelineMD(md_path=data_path, sample_mds=sample_mds,
+            self.pipeline = DataPipelineMD(md_path=data_mdpdb_path, sample_mds=sample_mds,
                                            ignore_hydrogens=ignore_hydrogens)
         else:
-            self.pipeline = DataPipelineMD(md_path=data_path, sample_mds=None, ignore_hydrogens=ignore_hydrogens)
+            self.pipeline = DataPipelineMD(md_path=data_mdpdb_path, sample_mds=None, ignore_hydrogens=ignore_hydrogens)
 
     def __len__(self):
         if self.mode == "train" or self.mode == "val":
             return int(self.num_data*self.num_repeats)
+            # intents data augumentation
         else:
             return self.num_data
             
@@ -1419,7 +1435,6 @@ class MDDataset(Dataset):
         
     
         if self.model == "backbone":
-            
             
             peptide_seq, coordinates_all, amino_acid_pos,\
                 atoms, atom_names, bond_matrix = features
@@ -1437,6 +1452,7 @@ class MDDataset(Dataset):
                     all_features.append(convert_to_tensor(_get_backbone_features(features)))
                     
             return all_features
+        
         elif self.model == "rotamer":
             
             peptide_seq, coordinates_all, amino_acid_pos,\
