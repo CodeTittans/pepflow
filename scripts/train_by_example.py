@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../pepflow/')
+
 from pepflow.model.model import BackboneModel
 from pepflow.model.dynamics import DynamicsRotamer, DynamicsHydrogen
 from pepflow.model.model_configs import config_rotamer, config_hydrogen,\
@@ -11,7 +14,6 @@ from pepflow.utils.training_utils import sample_centered_noise,\
 from time import time
 import datetime
 import torch
-import sys
 import argparse
 import numpy as np
 import os
@@ -29,13 +31,16 @@ def to_cuda(features):
     
     return features
 
-def load_dataset(path_to_seqs, path_to_mdtraj, model_type, batch_size = 8):
+def load_dataset(path_to_seqs, path_to_mdpdbs, model_type, batch_size = 8):
 
     dataset = MDDataset(mode="train", 
-                        data_path=path_to_mdtraj, # aim to take the data_path from argparse.
-                        data_dir=path_to_seqs,  # Path to dataset saved as .npy storing AA seqs., 
+                        data_mdpdb_path=path_to_mdpdbs, # aim to take the data_path from argparse.
+                        data_dir_seq=path_to_seqs,  # Path to dataset saved as .npy storing AA seqs., 
                         model=model_type) 
-    validation_dataset = MDDataset(mode="val", model=model_type)    
+    validation_dataset = MDDataset(mode="val", 
+                                   data_mdpdb_path=path_to_mdpdbs,
+                                   data_dir_seq=path_to_seqs,
+                                   model=model_type)    
 
     collate_fn = collate_multiple_coords        
     loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, 
@@ -68,7 +73,7 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
     iters = len(train_loader)
     
 #    assert iters == round(len(dataset) / batch_size), f"{iters} != {round(len(dataset) / batch_size)}, which is not expected."
-    print(f"DBG: iter {iters} == {round(len(train_loader) / batch_size)}")
+    print(f"DBG: iter {iters} == {round(len(train_loader.dataset) / batch_size)}")
 
     for e in range(epochs):
 
@@ -284,10 +289,16 @@ if __name__ == "__main__":
     parser.add_argument("-ht", dest="hypernetwork_type", type=str, 
                         help="Type of hypernetwork to use, either bert or resnet",
                         required=False, default=None)
-    parser.add_argument("-dt", dest="dataset", type=str, 
-                        help="Dataset to train on MD",
-                        required=False, default="MD")
     
+    ## Shinji added
+    parser.add_argument("-seqs", dest="path_to_seqs", type=str, 
+                        help="Dataset of sequences",
+                        required=True)
+    parser.add_argument("-pdbs", dest="path_to_mdpdbs", type=str, 
+                        help="Dataset of sequences",
+                        required=True)
+
+
     args = parser.parse_args()
 
     if args.model != "backbone" and args.model != "protonation" and args.model != "rotamer":
@@ -303,20 +314,23 @@ if __name__ == "__main__":
     elif args.model == "backbone":
         
         if args.hypernetwork_type == "bert":
+            print('DBG: config is config_backbone_bert')
             config = config_backbone_bert
         elif args.hypernetwork_type == "resnet":
             config = config_backbone
         else:
            raise ValueError("Hypernetwork type argument is invalid, must be one of bert or resnet")
 
+        print("Batch size of config.training (Before1): ", config.training.batch_size, config['training']['batch_size'])
         model = BackboneModel(config)
-
+        print('DBG: model is this:', model)
         print("The number of parameters in the hypernetwork is %i" 
               %(sum(p.numel()for p in model.hypernetwork.parameters() if p.requires_grad)))   
   
+        #print("DBG: config.iida", config.iida)
+        #config.training = config.finetuning_md
+        print("Batch size of config.training (After1): ", config.training.batch_size, config['training']['batch_size'])
 
-        config.training = config.finetuning_md
-        print("Batch size of config.training: ", config.training.batch_size)
     sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
                                 beta_max=config.sde_config.beta_max)
     
@@ -335,8 +349,8 @@ if __name__ == "__main__":
     print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
 
     # Load datasets
-    train_loader, validation_loader = load_dataset(path_to_seqs='../datasets/', 
-                                                   path_to_mdtraj='../md_pdbs', 
+    train_loader, validation_loader = load_dataset(path_to_seqs=args.path_to_seqs, 
+                                                   path_to_mdpdbs=args.path_to_mdpdbs, 
                                                    model_type=args.model, 
                                                    batch_size = config.training.batch_size)    
 
