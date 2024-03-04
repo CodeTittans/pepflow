@@ -1,6 +1,3 @@
-import sys
-sys.path.append('../pepflow/')
-
 from pepflow.model.model import BackboneModel
 from pepflow.model.dynamics import DynamicsRotamer, DynamicsHydrogen
 from pepflow.model.model_configs import config_rotamer, config_hydrogen,\
@@ -13,6 +10,7 @@ import numpy as np
 import torch
 import argparse
 import os
+import sys
 
 def to_cuda(features):
     
@@ -24,77 +22,6 @@ def to_cuda(features):
             
     
     return features
-
-
-def generate_backbone_samples(sequence, model, backbone_sde, 
-                            num_samples, likelihood, output_directory, 
-                            chunksize,
-                            single_structure_prediction):
-    
-    
-    if not os.path.isdir(output_directory):
-        os.mkdir(output_directory)
-        
-    features = get_features_from_seq(sequence)
-    
-    all_likelihoods = []
-    
-    all_coords = []
-    
-    all_energies = []
-    
-    start_time = time()
-    
-    for num in range(num_samples//chunksize):
-        print("Currently on chunk %i of %i, elapsed time %f" %(num+1, num_samples//chunksize, 
-                                                               time()-start_time))
-        sys.stdout.flush()
-        full_coords, likelihoods, _ = model.sample_backbone(to_cuda(features), backbone_sde, 
-                                                                      num_samples=num_samples,
-                                                                      likelihood=likelihood)
-        #     def sample_backbone(self, features, sde, num_samples=1, rtol=1e-3, atol=1e-3, solver='RK23',
-        #                likelihood=True, exact_trace=False, differentiable=False, multiple_points=False):
-
-        all_coords.append(full_coords)
-                
-        all_likelihoods.append(likelihoods)
-        
-    full_coords = torch.cat(all_coords, dim=1)
-    
-
-    atom_names = features["atom_names_backbone"][0] 
-    length = len(features["atom_names_backbone"][0])
-    amino_acid_pos = features["amino_acid_pos_backbone"][0, :length].cpu().numpy()
-        
-    
-    pdb_utils.output_structure(full_coords[0], 
-        atom_names, 
-        sequence, 
-        amino_acid_pos,
-        os.path.join(output_directory, sequence + ".pdb"))
-    
-    if single_structure_prediction:
-        single_prediction = pdb_utils.get_single_structure_prediction(os.path.join(output_directory, sequence + ".pdb"))
-        
-        pdb_utils.output_structure(full_coords[0][single_prediction:single_prediction+1], 
-            atom_names, 
-            sequence, 
-            amino_acid_pos,
-            os.path.join(output_directory, sequence + "_single_prediction.pdb"))
-    
-        likelihoods = torch.cat(all_likelihoods, dim=1)
-        with open(os.path.join(output_directory, sequence + "_report.out"), 'w') as f:
-            header = "Model"
-            header = header + "\tLikelihood"                           
-            header = header + "\n"
-            f.writelines(header)
-            
-            for index in range(num_samples):
-                row = str(index+1)
-                row = row + "\t" + str(likelihoods.cpu().detach().numpy()[0][index])                
-                row = row + "\n"
-                f.writelines(row)
-
 
 def generate_samples(sequence, model, backbone_sde, rotamer_sde, protonation_sde, 
                      num_samples, likelihood, compute_energies, output_directory, 
@@ -291,46 +218,46 @@ if __name__ == "__main__":
         
         
         
-        # config = config_rotamer
-        # rotamer_dynamics = DynamicsRotamer(config.model_config)
+        config = config_rotamer
+        rotamer_dynamics = DynamicsRotamer(config.model_config)
         
-        # rotamer_sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
-        #                         beta_max=config.sde_config.beta_max,
-        #                         temperature=0.4)
+        rotamer_sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
+                                beta_max=config.sde_config.beta_max,
+                                temperature=0.4)
         
-        # if config.training.ema != None and "ema_state_dict" in torch.load(args.rotamer_model):
-        #     ema = ExponentialMovingAverage(rotamer_dynamics.parameters(), decay=config.training.ema)
-        #     ema.load_state_dict(torch.load(args.rotamer_model)["ema_state_dict"])
+        if config.training.ema != None and "ema_state_dict" in torch.load(args.rotamer_model):
+            ema = ExponentialMovingAverage(rotamer_dynamics.parameters(), decay=config.training.ema)
+            ema.load_state_dict(torch.load(args.rotamer_model)["ema_state_dict"])
             
-        #     ema.copy_to(rotamer_dynamics.parameters())
+            ema.copy_to(rotamer_dynamics.parameters())
         
-        # else:
+        else:
             
-        #     rotamer_dynamics.load_state_dict(torch.load(args.rotamer_model)["model_state_dict"])
+            rotamer_dynamics.load_state_dict(torch.load(args.rotamer_model)["model_state_dict"])
         
         
     
-        # config = config_hydrogen
-        # hydrogen_dynamics = DynamicsHydrogen(config.model_config)
+        config = config_hydrogen
+        hydrogen_dynamics = DynamicsHydrogen(config.model_config)
         
-        # hydrogen_sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
-        #                         beta_max=config.sde_config.beta_max,
-        #                         temperature=1.0)
+        hydrogen_sde = config.sde_config.sde(beta_min=config.sde_config.beta_min,
+                                beta_max=config.sde_config.beta_max,
+                                temperature=1.0)
         
-        # if config.training.ema != None and "ema_state_dict" in torch.load(args.hydrogen_model):
-        #     ema = ExponentialMovingAverage(hydrogen_dynamics.parameters(), decay=config.training.ema)
-        #     ema.load_state_dict(torch.load(args.hydrogen_model)["ema_state_dict"])
+        if config.training.ema != None and "ema_state_dict" in torch.load(args.hydrogen_model):
+            ema = ExponentialMovingAverage(hydrogen_dynamics.parameters(), decay=config.training.ema)
+            ema.load_state_dict(torch.load(args.hydrogen_model)["ema_state_dict"])
             
-        #     ema.copy_to(hydrogen_dynamics.parameters())
+            ema.copy_to(hydrogen_dynamics.parameters())
         
-        # else:
+        else:
             
-        #     hydrogen_dynamics.load_state_dict(torch.load(args.hydrogen_model)["model_state_dict"])
+            hydrogen_dynamics.load_state_dict(torch.load(args.hydrogen_model)["model_state_dict"])
         
         
-        # model.hydrogen_dynamics = hydrogen_dynamics
+        model.hydrogen_dynamics = hydrogen_dynamics
         
-        # model.rotamer_dynamics = rotamer_dynamics
+        model.rotamer_dynamics = rotamer_dynamics
         
         torch.cuda.empty_cache()
         model.cuda()
@@ -377,12 +304,8 @@ if __name__ == "__main__":
 
     
     model.eval()
-    # generate_samples(args.sequence, model, backbone_sde, rotamer_sde, hydrogen_sde, 
-    #                  args.num_samples, args.likelihood, args.compute_energies, args.output_directory,
-    #                  args.protonate, args.sample_rotamers, args.fix_chirality, args.d_peptide,
-    #                  args.chunk_size, args.single_structure_prediction)
+    generate_samples(args.sequence, model, backbone_sde, rotamer_sde, hydrogen_sde, 
+                     args.num_samples, args.likelihood, args.compute_energies, args.output_directory,
+                     args.protonate, args.sample_rotamers, args.fix_chirality, args.d_peptide,
+                     args.chunk_size, args.single_structure_prediction)
     
-generate_backbone_samples(args.sequence,model, backbone_sde, 
-                          args.num_samples, args.likelihood, args.output_directory, 
-                          args.chunk_size,
-                          args.single_structure_prediction)
