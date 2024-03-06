@@ -56,7 +56,7 @@ config_backbone_bert = mlc.ConfigDict(
         "training":
         {
             "lr": 0.0001,
-            "batch_size":32,
+            "batch_size":8,
             "ema":0.9999,
             "gradient_clip":1
         },
