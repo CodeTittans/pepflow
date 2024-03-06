@@ -144,9 +144,7 @@ def _get_rotamer_features(features):
     
     fragment_seq, coordinates, amino_acid_pos, atoms, atom_names,\
             bond_matrix = features
-            
 
-        
     # compute centroid features
     
     is_backbone = np.isin(atoms, backbone_atom_indices)
@@ -158,7 +156,6 @@ def _get_rotamer_features(features):
     coordinates_centroid = []
 
     centroid_indices = []
-    
     for index, res in enumerate(fragment_seq):
         
         if res == residue_order["G"]:
@@ -169,15 +166,15 @@ def _get_rotamer_features(features):
                                                             amino_acid_pos == index+1), :]
         
         centroid_coord = np.mean(coordinates_side_chain, axis=0)
-        
+
         coordinates_centroid.append(centroid_coord)
         
-      
-
         centroid_indices.append(centroid_counter)
         
         centroid_counter += 1
     
+    assert len(coordinates_centroid) > 0, f"WARNING: coordinates_centroid is {coordinates_centroid}. Probably, the sequence consists of glycines only. fragment_seq = {fragment_seq}"
+
     centroid_indices = np.array(centroid_indices)
     
     coordinates_centroid = np.array(coordinates_centroid)
@@ -186,8 +183,7 @@ def _get_rotamer_features(features):
     
     mean_coords = np.sum(coordinates, axis=0)[None, :]/len(coordinates)
     
-    coordinates = coordinates - \
-        mean_coords
+    coordinates = coordinates - mean_coords
     
     if len(coordinates_centroid) > 0:
         
@@ -1368,7 +1364,7 @@ class MDDataset(Dataset):
                  mode="train",
                  pad=True, 
                  model="backbone", 
-                 num_repeats=100, 
+                 num_repeats=1, #100, 
                  sample_mds=1):
 
     # def __init__(self, mode="train", data_dir="../datasets",
@@ -1389,15 +1385,21 @@ class MDDataset(Dataset):
         
         
         if mode == "train":
+            # self.data_list = np.load(os.path.join(data_dir_seq, "train_seq2_peptide_070_G_removed.npy"))
+            # self.data_list = np.load(os.path.join(data_dir_seq, "train_seq3_peptide_070.npy"))
             self.data_list = np.load(os.path.join(data_dir_seq, "train_seq2_peptide_070.npy"))
             #self.data_list = np.load(os.path.join(data_dir_seq, "train_md_data.npy"))
             #                                                ^ list of sequences like ['AAA', ...]
 
         elif mode == "val":
-            self.data_list = np.load(os.path.join(data_dir_seq, "val_md_data_no_mod.npy"))
+            self.data_list = np.load(os.path.join(data_dir_seq, "val_seq2_peptide_015.npy"))
+            #self.data_list = np.load(os.path.join(data_dir_seq, "val_seq3_peptide_015.npy"))
+            # self.data_list = np.load(os.path.join(data_dir_seq, "val_seq2_peptide_015.npy"))
 
         elif mode == "test":
-            self.data_list = np.load(os.path.join(data_dir_seq, "test_md_data_no_mod.npy"))
+            # self.data_list = np.load(os.path.join(data_dir_seq, "test_seq1_peptide_015.npy"))
+            # self.data_list = np.load(os.path.join(data_dir_seq, "test_seq3_peptide_015.npy"))
+            self.data_list = np.load(os.path.join(data_dir_seq, "test_seq2_peptide_015.npy"))
        
 
         self.mode = mode
@@ -1419,21 +1421,14 @@ class MDDataset(Dataset):
     def __len__(self):
         if self.mode == "train" or self.mode == "val":
             return int(self.num_data*self.num_repeats)
-            # intents data augumentation
+            # NOTE: This line intends data augumentation. I don't think this is necessary. Why not just incrase no. of epochs? 
         else:
             return self.num_data
             
     def __getitem__(self, index):
-
-      
-        
         item = self.data_list[index % self.num_data]
-        
-        
-      
         features = self.pipeline.compute_features(item)
-        
-    
+
         if self.model == "backbone":
             
             peptide_seq, coordinates_all, amino_acid_pos,\
@@ -1457,14 +1452,26 @@ class MDDataset(Dataset):
             
             peptide_seq, coordinates_all, amino_acid_pos,\
                 atoms, atom_names, bond_matrix = features
-                
-            all_features = []
             
+            # NOTE ===============
+            #    `peptide_seq` is a list of amino-acid ids, e.g., GGG to [7,7,7].
+            #     In the case of GGG, it is not possible to calculate the distance between center-of-mass points of their side chains.
+            #     This leads to an error in calling `cdist` in `_get_rotamer_features`.
+            #     Also, such a sequence do not have to be trained on rotamer network, 
+            #     so I added the following lines that skips all glysine peptides in a dataloader loop.
+            if all(aa == 7 for aa in peptide_seq): # 7 corresponds to Gly. see the mapping in utils/constants.py 
+                print(f"peptide_seq (= {peptide_seq}) is skipped because its sequence consists of only Glys.")
+                all_features = None
+                return all_features # in the trainig loop, if all_features == None, then it skips the data.
+            # =====================
+
+            all_features = []
+
             for coordinates in coordinates_all:
             
                 features = peptide_seq, coordinates, amino_acid_pos,\
                     atoms, atom_names, bond_matrix
-                    
+                
                 if self.pad:
                     all_features.append(pad_features(_get_rotamer_features(features)))
                 else:
