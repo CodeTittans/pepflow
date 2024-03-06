@@ -73,7 +73,7 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
     iters = len(train_loader)
     
 #    assert iters == round(len(dataset) / batch_size), f"{iters} != {round(len(dataset) / batch_size)}, which is not expected."
-    print(f"DBG: iter {iters} == {round(len(train_loader.dataset) / batch_size)}")
+    print(f"DBG: #iterable data {iters} == {round(len(train_loader.dataset) / batch_size)} (=round(len(train_loader.dataset) / batch_size))")
 
     for e in range(epochs):
 
@@ -82,13 +82,12 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
         
         
         for value, features in enumerate(train_loader):
-            #print(f"DBG 126: value(iter)={value}, features.keys={features.keys()}")
+
             if features == None:
                 continue
 
             torch.cuda.empty_cache()
-          
-            
+
             optimizer.zero_grad()
             if model_type == "rotamer":
                 z, t, perturbed_data, mean, std = sample_centered_noise(sde, features["coordinates_rotamer"], 
