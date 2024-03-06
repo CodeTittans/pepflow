@@ -27,11 +27,13 @@ def pad_features(features):
         
         if "names" in feature or "cyclic_bond_indices" in feature:
             features_padded[feature] = features[feature]
+
         elif "permuted_coords" in feature:
             features_padded[feature] = torch.as_tensor(_pad(features[feature],
                 feature_dims[feature][0],
                 feature_dims[feature][2]),
-                dtype=feature_dims[feature][1]).unsqueeze(1)    
+                dtype=feature_dims[feature][1]).unsqueeze(1)
+            
         elif "coordinates" in feature:
             features_padded[feature] = torch.as_tensor(_pad(features[feature],
                 feature_dims[feature][0],
