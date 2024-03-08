@@ -2,6 +2,7 @@
 Energy and Force computation in OpenMM
 Implementation taken from bgflow
 https://github.com/noegroup/bgflow
+https://github.com/noegroup/bgflow/blob/main/bgflow/distribution/energy/openmm.py
 """
 
 import warnings
