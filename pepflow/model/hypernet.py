@@ -236,7 +236,8 @@ class HyperBERT(nn.Module):
         
         super(HyperBERT, self).__init__()
 
-        self.embedding = nn.Embedding(22, d_model)
+        # self.embedding = nn.Embedding(22, d_model)
+        self.embedding = nn.Embedding(25, d_model)
         
         self.positional_embedding = nn.Embedding(16, d_model)
         
@@ -326,7 +327,7 @@ class HyperBERT(nn.Module):
 
     def process_tensors(self, sequence):
 
-        cls_token = torch.ones_like(sequence[..., :1]).to(sequence.device) * 21
+        cls_token = torch.ones_like(sequence[..., :1]).to(sequence.device) * 24 # 21
                         
         sequence = torch.cat([cls_token, sequence], -1)
         
