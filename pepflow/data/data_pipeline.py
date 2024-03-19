@@ -40,8 +40,6 @@ def add_3to1_1to3_letter_mapping(three_letter, one_letter) -> None:
     PDB.Polypeptide.d3_to_index[n3] = i
     PDB.Polypeptide.dindex_to_3[i] = n3
 
-    constants.residue_order[one_letter] = i
-    constants.ATOM_DICT[three_letter] = []
     return None
 
 add_3to1_1to3_letter_mapping('ACE', 'B')
