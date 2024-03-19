@@ -10,6 +10,44 @@ import io
 import os
 import pdbfixer
 
+def add_3to1_1to3_letter_mapping(three_letter, one_letter) -> None:
+    """
+    Update the mapping from 3 to 1 and 1 to 3 letter residue codes in Biopython version 1.79.
+
+    This function appends the provided three-letter residue code to the PDB.Polypeptide.aa3 list,
+    and adds the provided one-letter residue code to the PDB.Polypeptide.aa1 string. It also updates
+    various dictionaries and lists in the PDB.Polypeptide and constants modules to maintain the
+    consistent mapping between the one and three-letter residue codes.
+
+    Args:
+        three_letter (str): The three-letter residue code to add.
+        one_letter (str): The one-letter residue code to add.
+
+    Returns:
+        None
+    """
+    PDB.Polypeptide.aa3.append(three_letter) # ['ACE', 'NME', 'NH2'])
+    PDB.Polypeptide.aa1 = PDB.Polypeptide.aa1 + one_letter # 'B' + 'Z' + 'X' # B:ACE, Z:NME, X:NH2
+
+    n_aa = len(PDB.Polypeptide.aa3) # => 20 by default.  
+    assert len(PDB.Polypeptide.aa3) == len(PDB.Polypeptide.aa1), f"#aa3 and #aa1 are mismatched. {len(PDB.Polypeptide.aa3)} != {len(PDB.Polypeptide.aa1)}"
+    i = n_aa - 1 # NOTE: each AA is indexed between 0-19 by default.
+
+    n1 = PDB.Polypeptide.aa1[i]
+    n3 = PDB.Polypeptide.aa3[i]
+    PDB.Polypeptide.d1_to_index[n1] = i
+    PDB.Polypeptide.dindex_to_1[i] = n1
+    PDB.Polypeptide.d3_to_index[n3] = i
+    PDB.Polypeptide.dindex_to_3[i] = n3
+
+    constants.residue_order[one_letter] = i
+    constants.ATOM_DICT[three_letter] = []
+    return None
+
+add_3to1_1to3_letter_mapping('ACE', 'B')
+add_3to1_1to3_letter_mapping('NME', 'Z')
+add_3to1_1to3_letter_mapping('NHE', 'X')
+
 
 class ValidAtoms(PDB.Select):
 
