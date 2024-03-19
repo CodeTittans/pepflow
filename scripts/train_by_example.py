@@ -17,6 +17,7 @@ import torch
 import argparse
 import numpy as np
 import os
+# os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable CUDA
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -54,7 +55,7 @@ def load_dataset(path_to_seqs, path_to_mdpdbs, model_type, batch_size = 8):
 
 def train(model, optimizer, train_loader, validation_loader, model_type,
           epochs, output_file, batch_size, sde, ema_decay, 
-          gradient_clip = None, eps=1e-5, saved_params=None):
+          gradient_clip = None, eps=1e-5, saved_params=None, device='cuda'):
         
     if ema_decay != None:
         
@@ -91,21 +92,22 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
             optimizer.zero_grad()
             if model_type == "rotamer":
                 z, t, perturbed_data, mean, std = sample_centered_noise(sde, features["coordinates_rotamer"], 
-                                                             features["atom_mask_rotamer"], device="cuda",
+                                                             features["atom_mask_rotamer"], device=device,
                                                              indices=features["amino_acid_pos_rotamer"].long() - 1)
             elif model_type == "protonation":
                 z, t, perturbed_data, mean, std = sample_noise(sde, features["coordinates_h"], 
                                                                features["atom_mask_h"],
-                                                               device="cuda")
+                                                               device=device)
             elif model_type == "backbone":
                 z, t, perturbed_data, mean, std = sample_noise(sde, features["coordinates_backbone"], 
                                                                features["atom_mask_backbone"],
-                                                               device="cuda")
+                                                               device=device)
             
 
-            score_fn = model.get_score_fn(to_cuda(features), sde)
-                    
-    
+            if device == 'cuda':
+                score_fn = model.get_score_fn(to_cuda(features), sde)
+            elif device == 'cpu':
+                score_fn = model.get_score_fn(features, sde)
                 
             prediction = score_fn(perturbed_data, t)
 
@@ -176,18 +178,21 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                             break
                         if model_type == "rotamer":
                             z, t, perturbed_data, mean, std = sample_centered_noise(sde, features["coordinates_rotamer"], 
-                                                                         features["atom_mask_rotamer"], device="cuda",
+                                                                         features["atom_mask_rotamer"], device=device,
                                                                          indices=features["amino_acid_pos_rotamer"].long() - 1)
                         elif model_type == "protonation":
                             z, t, perturbed_data, mean, std = sample_noise(sde, features["coordinates_h"], 
                                                                            features["atom_mask_h"],
-                                                                           device="cuda")
+                                                                           device=device)
                         elif model_type == "backbone":
                             z, t, perturbed_data, mean, std = sample_noise(sde, features["coordinates_backbone"], 
                                                                            features["atom_mask_backbone"], 
-                                                                           device="cuda")
-                        score_fn = model.get_score_fn(to_cuda(features), sde)
-                        
+                                                                           device=device)
+                        if device == 'cuda':
+                            score_fn = model.get_score_fn(to_cuda(features), sde)
+                        elif device == 'cpu':
+                            score_fn = model.get_score_fn(features, sde)
+
                         prediction = score_fn(perturbed_data, t)
             
                         if model_type == "rotamer":
@@ -296,6 +301,8 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
+    device = 'cpu'
+
 
     if args.model != "backbone" and args.model != "protonation" and args.model != "rotamer":
         raise ValueError("Model argument is invalid, must be one of backbone, rotamer or protonation")
@@ -328,7 +335,8 @@ if __name__ == "__main__":
     if args.use_saved:
         model.load_state_dict(torch.load(args.saved_model)["model_state_dict"])
 
-    model.cuda()
+    # model.cuda()
+    model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.training.lr)
     if args.use_saved:
@@ -348,10 +356,10 @@ if __name__ == "__main__":
               args.epochs, args.output_file, config.training.batch_size,
               sde, 
               ema_decay=config.training.ema, 
-              gradient_clip=config.training.gradient_clip)
+              gradient_clip=config.training.gradient_clip, device=device)
     else:
         train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
               sde, 
               ema_decay=config.training.ema, 
-              gradient_clip=config.training.gradient_clip)
+              gradient_clip=config.training.gradient_clip, device=device)
