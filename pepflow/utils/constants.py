@@ -450,6 +450,27 @@ COVALENT_BOND_DICT = {
         ('N', 'H3'),
         ('N', 'H2'),
     ],
+    "ACE":
+    [
+        ('CH3', 'HH31'),
+        ('CH3', 'HH32'),
+        ('CH3', 'HH33'),
+        ('CH3', 'C'),
+        ('C', 'O')
+    ],
+    "NME": 
+    [
+        ('CH3', 'HH31'),
+        ('CH3', 'HH32'),
+        ('CH3', 'HH33'),
+        ('CH3', 'N'),
+        ('N', 'HN')
+    ],
+    "NHE":
+    [
+        ('N', 'HN1'),
+        ('N', 'HN2')
+    ]
 }
 
 
@@ -474,6 +495,9 @@ ATOM_DICT = {
     "TRP": ['N', 'CA', 'H', 'C', 'CB', 'HA', 'O', 'OXT', 'CG', 'HB2', 'HB3', 'CD1', 'CD2', 'NE1', 'HD1', 'CE2', 'CE3', 'HE1', 'CZ2', 'CZ3', 'HE3', 'CH2', 'HZ2', 'HZ3', 'HH2', 'H3', 'H2'],
     "TYR": ['N', 'CA', 'H', 'C', 'CB', 'HA', 'O', 'OXT', 'CG', 'HB2', 'HB3', 'CD1', 'CD2', 'CE1', 'HD1', 'CE2', 'HD2', 'CZ', 'HE1', 'HE2', 'OH', 'HH', 'H3', 'H2'],
     "VAL": ['N', 'CA', 'H', 'C', 'CB', 'HA', 'O', 'OXT', 'CG1', 'CG2', 'HB', 'HG11', 'HG12', 'HG13', 'HG21', 'HG22', 'HG23', 'H3', 'H2'],
+    "ACE": ['H1', 'CH3', 'H2', 'H3', 'C', 'O'], 
+    "NME": ['N', 'CH3', 'H', '1HH3', '2HH3', '3HH3'],
+    "NHE": ['N', 'HN1', 'HN2']
 }
 
 
@@ -532,6 +556,9 @@ RESIDUE_LIST = [
     "W",
     "Y",
     "V",
+    "B", # ACE
+    "Z", # NME
+    "X"  # NHE
 ]
 
 residue_order = {residue: i for i, residue in enumerate(RESIDUE_LIST)}
