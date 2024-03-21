@@ -298,10 +298,10 @@ if __name__ == "__main__":
     parser.add_argument("-pdbs", dest="path_to_mdpdbs", type=str, 
                         help="Dataset of sequences",
                         required=True)
-
+    parser.add_argument("-dev", type=str, help="Device: cpu/cuda", default='cpu')
 
     args = parser.parse_args()
-    device = 'cpu'
+    device = args.dev
 
 
     if args.model != "backbone" and args.model != "protonation" and args.model != "rotamer":
