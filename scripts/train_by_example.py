@@ -6,8 +6,7 @@ from pepflow.model.dynamics import DynamicsRotamer, DynamicsHydrogen
 from pepflow.model.model_configs import config_rotamer, config_hydrogen,\
     config_backbone_bert, config_backbone
 from pepflow.model.ema import ExponentialMovingAverage
-from pepflow.data.dataset import FragmentDatasetRotamer, FragmentDatasetHydrogen,\
-    FragmentDatasetBackbone, MDDataset
+from pepflow.data.dataset import MDDataset
 from pepflow.utils.dataset_utils import collate, collate_multiple_coords
 from pepflow.utils.training_utils import sample_centered_noise,\
     sample_noise, dsm
