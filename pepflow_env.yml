@@ -4,13 +4,16 @@ channels:
   - omnia
   - defaults
 dependencies:
-  - python=3.7.6
+  - python=3.8
   - torchdiffeq
   - scipy
   - openmm
-  - biopython
+  - biopython=1.79 # not to use 1.8.x
   - mdtraj
+  - pdbfixer # ADD
   - pip
   - pip:
     - --index-url https://download.pytorch.org/whl/cu117
     - torch
+    - ml-collections==0.1.1 # ADD
+    - torch-scatter -f https://data.pyg.org/whl/torch-1.13.1+cu117.html
