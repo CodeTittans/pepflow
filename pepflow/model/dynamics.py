@@ -44,7 +44,7 @@ class DynamicsBackbone(nn.Module):
         atom_one_hot = F.one_hot(atom_labels, num_classes=5)
         
         amino_acid_one_hot = F.one_hot(torch.gather(peptide_seq, dim=1, index=amino_acid_pos-1),
-                                       num_classes=23) # 20 in the original code
+                                       num_classes=20) # 20 in the original code
 
         position_one_hot = F.one_hot(amino_acid_pos-1, num_classes=15)
         
