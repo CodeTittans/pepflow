@@ -15,5 +15,3 @@ dependencies:
   - pip:
     - --index-url https://download.pytorch.org/whl/cu117
     - torch
-    - ml-collections==0.1.1 # ADD
-    - torch-scatter -f https://data.pyg.org/whl/torch-1.13.1+cu117.html
