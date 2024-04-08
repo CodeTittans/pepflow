@@ -54,22 +54,12 @@ def load_dataset(path_to_train_data, path_to_val_data, path_to_test_data, path_t
     return loader, validation_loader
 
 def train(model, optimizer, train_loader, validation_loader, model_type,
-          epochs, output_file, batch_size, sde, ema_decay, 
+          epochs, output_file, batch_size, sde, ema,
           gradient_clip = None, eps=1e-5, saved_params=None, device='cuda'):
-        
-    if ema_decay != None:
-        
-        ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
-        
-        if saved_params != None:
-            
-            ema.load_state_dict(torch.load(saved_params)["ema_state_dict"])
-    
+
     start_time = time()
 
     log_step = 100
-    
-    validation_losses = []
 
     iters = len(train_loader)
     
@@ -133,10 +123,8 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                 torch.nn.utils.clip_grad_norm_(model.parameters(), gradient_clip)
             
             optimizer.step()
-        
-            if ema_decay != None:
-                
-                ema.update(model.parameters()) 
+                        
+            ema.update(model.parameters()) 
 
             if (value+1) % log_step == 0 or value == iters - 1:
 
@@ -161,12 +149,10 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                 
                 losses = []
                 
+                                    
+                ema.store(model.parameters())
+                ema.copy_to(model.parameters())
                 
-                if ema_decay != None:
-                    
-                    ema.store(model.parameters())
-                    ema.copy_to(model.parameters())
-                    
                 
                 for value_val, features in enumerate(validation_loader):
                     if features == None:
@@ -210,52 +196,37 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                             losses.append(torch.sum(i).detach())
                         
             
-                if ema_decay != None:
-                    ema.restore(model.parameters())
+                ema.restore(model.parameters())
                     
                 losses = torch.stack(losses, dim=0)
                 
                 losses = losses.cpu().numpy()
 
                 validation_losses.append(np.mean(losses))
-
-                log = "This is validation, Epoch [{}/{}]".format(
-                    e + 1, epochs)
-
-                log += ", {}: {:.5f}".format('Loss', np.mean(losses))
-                log += ", {}: {:.5f}".format('Std', np.std(losses))
             
+                # Save model, optimizer, and EMA states when a new minimum validation loss is achieved
                 if validation_losses[-1] == min(validation_losses):
-                    
 
                     param_dict = {"model_state_dict": model.state_dict(),
-                            "optimizer_state_dict":optimizer.state_dict()
-                            }
-                    
-                        
-                    
-                    if ema_decay != None:
-                        
-                        param_dict["ema_state_dict"] = ema.state_dict()
-                        
-                    print("Saving model with new minimum validation loss")
+                                  "optimizer_state_dict":optimizer.state_dict(),
+                                  "validation_loss": validation_losses[-1]}
+                                            
+                    param_dict["ema_state_dict"] = ema.state_dict()
+                    print(f"    Validation, Epoch: [{e + 1}/{epochs}], Loss: {np.mean(losses):.5f}, Std: {np.std(losses):.5f}")
+                    print("        Saving model with new minimum validation loss")
                     torch.save(param_dict, output_file)
-                    print("Saved model successfully!")
-
+                    print("        Saved model successfully!")
                 
-                print(log)
-                
-                if (value+1) % 1000 == 0:
+                if (value+1) % 10 == 0:
                     if not os.path.isdir("checkpoints_" + model_type):
                         os.mkdir("checkpoints_" + model_type)
                         
                    
                     torch.save({"model_state_dict": model.state_dict(),
-                                "optimizer_state_dict":optimizer.state_dict()
+                                "optimizer_state_dict":optimizer.state_dict(),
+                                "validation_loss": validation_losses[-1],
                                 }, "checkpoints_" + model_type +"/" +\
                                output_file.replace(".pth", "_" + str(value+1) + ".pth"))
-                        
-                    
                     
                 losses = []
               
@@ -263,14 +234,14 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                 model.train()
 
         # @@@ Save model parameters at each epoch
-        param_dict = {"model_state_dict": model.state_dict(),
-                      "optimizer_state_dict":optimizer.state_dict()
-                     }                             
-        if ema_decay != None:
-            param_dict["ema_state_dict"] = ema.state_dict()
-        print(f"Saving model at epoch {e}")
-        torch.save(param_dict, output_file)
-        print("Saved model successfully!")
+        # param_dict = {"model_state_dict": model.state_dict(),
+        #               "optimizer_state_dict":optimizer.state_dict()
+        #              }                             
+        # if ema_decay != None:
+        #     param_dict["ema_state_dict"] = ema.state_dict()
+        # print(f"Saving model at epoch {e}")
+        # torch.save(param_dict, output_file)
+        # print("Saved model successfully!")
 
 if __name__ == "__main__":
 
@@ -299,7 +270,7 @@ if __name__ == "__main__":
     parser.add_argument("-path_to_train_data", type=str, required=True)
     parser.add_argument("-path_to_val_data", type=str, required=True)
     parser.add_argument("-path_to_test_data", type=str, required=True)
-
+    print("##########################################")
     args = parser.parse_args()
     device = args.dev
 
@@ -332,6 +303,7 @@ if __name__ == "__main__":
     
     torch.cuda.empty_cache()
 
+    print(f"DBG: args.use_saved={args.use_saved}")
     if args.use_saved:
         model.load_state_dict(torch.load(args.saved_model)["model_state_dict"])
 
@@ -341,6 +313,16 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=config.training.lr)
     if args.use_saved:
         optimizer.load_state_dict(torch.load(args.saved_model)["optimizer_state_dict"])
+        
+    ema = ExponentialMovingAverage(model.parameters(), decay=config.training.ema)
+    if args.use_saved:   
+        ema.load_state_dict(torch.load(args.saved_model)["ema_state_dict"])
+        validation_losses = [torch.load(args.saved_model)["validation_loss"]]
+        print(f"DBG: Validation loss at which the loaded model was saved: {validation_losses[0]:.5f}")
+
+    else:
+        validation_losses = []
+        print(f"DBG: Validation loss list initialisation: {validation_losses}")
 
     # Shinji Added: 
     print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
@@ -356,12 +338,10 @@ if __name__ == "__main__":
     if args.use_saved:
         train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
-              sde, 
-              ema_decay=config.training.ema, 
+              sde, ema=ema,
               gradient_clip=config.training.gradient_clip, device=device)
     else:
         train(model, optimizer, train_loader, validation_loader, args.model, 
               args.epochs, args.output_file, config.training.batch_size,
-              sde, 
-              ema_decay=config.training.ema, 
+              sde, ema=ema,
               gradient_clip=config.training.gradient_clip, device=device)
