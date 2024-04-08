@@ -1357,43 +1357,30 @@ class PeptideTestDataset(Dataset):
 class MDDataset(Dataset):
 
     def __init__(self, 
-                 data_dir_seq, 
                  data_mdpdb_path, 
+                 path_to_train_data="", 
+                 path_to_val_data="",    
+                 path_to_test_data="", 
                  mode="train",
                  pad=True, 
                  model="backbone", 
                  num_repeats=1,
                  sample_mds=1):
          
-        self.data_dir_seq = data_dir_seq
-
         self.pad = pad
         
         self.data_mdpdb_path = data_mdpdb_path
         
         self.model = model
-        
-        print(f"DBG 1382: self.data_dir_seq={self.data_dir_seq}")
-        print(f"DBG 1383: self.data_mdpdb_path={ self.data_mdpdb_path}")
-        
-        
+                
         if mode == "train":
-            # self.data_list = np.load(os.path.join(data_dir_seq, "train_seq2_peptide_070_G_removed.npy"))
-            self.data_list = np.load(os.path.join(data_dir_seq, "train_seq3_peptide_070.npy"))
-            # self.data_list = np.load(os.path.join(data_dir_seq, "train_seq2_peptide_070.npy"))
-            #self.data_list = np.load(os.path.join(data_dir_seq, "train_md_data.npy"))
-            #                                                ^ list of sequences like ['AAA', ...]
+            self.data_list = np.load(path_to_train_data)
 
         elif mode == "val":
-            # self.data_list = np.load(os.path.join(data_dir_seq, "val_seq2_peptide_015.npy"))
-            self.data_list = np.load(os.path.join(data_dir_seq, "val_seq3_peptide_015.npy"))
-            # self.data_list = np.load(os.path.join(data_dir_seq, "val_seq2_peptide_015.npy"))
+            self.data_list = np.load(path_to_val_data)
 
         elif mode == "test":
-            # self.data_list = np.load(os.path.join(data_dir_seq, "test_seq1_peptide_015.npy"))
-            self.data_list = np.load(os.path.join(data_dir_seq, "test_seq3_peptide_015.npy"))
-            # self.data_list = np.load(os.path.join(data_dir_seq, "test_seq2_peptide_015.npy"))
-       
+            self.data_list = np.load(path_to_test_data)
 
         self.mode = mode
     

@@ -31,15 +31,16 @@ def to_cuda(features):
     
     return features
 
-def load_dataset(path_to_seqs, path_to_mdpdbs, model_type, batch_size = 8):
+def load_dataset(path_to_train_data, path_to_val_data, path_to_test_data, path_to_mdpdbs, model_type, batch_size = 8):
 
     dataset = MDDataset(mode="train", 
                         data_mdpdb_path=path_to_mdpdbs, # aim to take the data_path from argparse.
-                        data_dir_seq=path_to_seqs,  # Path to dataset saved as .npy storing AA seqs., 
-                        model=model_type) 
+                        path_to_train_data=path_to_train_data,  # Path to dataset saved as .npy storing AA seqs., 
+                        model=model_type)
+    
     validation_dataset = MDDataset(mode="val", 
                                    data_mdpdb_path=path_to_mdpdbs,
-                                   data_dir_seq=path_to_seqs,
+                                   path_to_val_data=path_to_val_data,
                                    model=model_type)    
 
     collate_fn = collate_multiple_coords        
@@ -291,13 +292,13 @@ if __name__ == "__main__":
                         required=False, default=None)
     
     ## Shinji added
-    parser.add_argument("-seqs", dest="path_to_seqs", type=str, 
-                        help="Dataset of sequences",
-                        required=True)
     parser.add_argument("-pdbs", dest="path_to_mdpdbs", type=str, 
                         help="Dataset of sequences",
                         required=True)
     parser.add_argument("-dev", type=str, help="Device: cpu/cuda", default='cpu')
+    parser.add_argument("-path_to_train_data", type=str, required=True)
+    parser.add_argument("-path_to_val_data", type=str, required=True)
+    parser.add_argument("-path_to_test_data", type=str, required=True)
 
     args = parser.parse_args()
     device = args.dev
@@ -345,10 +346,12 @@ if __name__ == "__main__":
     print("GPU usage: ",  torch.cuda.memory_allocated() / (1024 * 1024), "MiB")
 
     # Load datasets
-    train_loader, validation_loader = load_dataset(path_to_seqs=args.path_to_seqs, 
+    train_loader, validation_loader = load_dataset(path_to_train_data=args.path_to_train_data, 
+                                                   path_to_val_data=args.path_to_val_data,
+                                                   path_to_test_data=args.path_to_test_data,
                                                    path_to_mdpdbs=args.path_to_mdpdbs, 
                                                    model_type=args.model, 
-                                                   batch_size = config.training.batch_size)    
+                                                   batch_size=config.training.batch_size)
 
     if args.use_saved:
         train(model, optimizer, train_loader, validation_loader, args.model, 
