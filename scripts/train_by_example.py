@@ -31,7 +31,7 @@ def to_cuda(features):
     
     return features
 
-def load_dataset(path_to_train_data, path_to_val_data, path_to_test_data, path_to_mdpdbs, model_type, batch_size = 8):
+def load_dataset(path_to_train_data, path_to_val_data, path_to_mdpdbs, model_type, batch_size = 8):
 
     dataset = MDDataset(mode="train", 
                         data_mdpdb_path=path_to_mdpdbs, # aim to take the data_path from argparse.
@@ -141,10 +141,10 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
 
                 losses = []
                 
-            #continue # to inactivate validation loss calculation
+            continue # to inactivate validation loss calculation
         
             # @@@ Validation
-            if (value+1) % 10000 == 0 or (value == iters - 1):
+            if (value+1) % 100 == 0 or (value == iters - 1):
                 model.eval()
                 
                 losses = []
@@ -234,14 +234,13 @@ def train(model, optimizer, train_loader, validation_loader, model_type,
                 model.train()
 
         # @@@ Save model parameters at each epoch
-        # param_dict = {"model_state_dict": model.state_dict(),
-        #               "optimizer_state_dict":optimizer.state_dict()
-        #              }                             
-        # if ema_decay != None:
-        #     param_dict["ema_state_dict"] = ema.state_dict()
-        # print(f"Saving model at epoch {e}")
-        # torch.save(param_dict, output_file)
-        # print("Saved model successfully!")
+        param_dict = {"model_state_dict": model.state_dict(),
+                      "optimizer_state_dict":optimizer.state_dict(),
+                     }
+        param_dict["ema_state_dict"] = ema.state_dict()
+        print(f"    Saving model at epoch {e}")
+        torch.save(param_dict, output_file)
+        print("    Saved model successfully!")
 
 if __name__ == "__main__":
 
@@ -269,7 +268,6 @@ if __name__ == "__main__":
     parser.add_argument("-dev", type=str, help="Device: cpu/cuda", default='cpu')
     parser.add_argument("-path_to_train_data", type=str, required=True)
     parser.add_argument("-path_to_val_data", type=str, required=True)
-    parser.add_argument("-path_to_test_data", type=str, required=True)
     print("##########################################")
     args = parser.parse_args()
     device = args.dev
@@ -317,8 +315,8 @@ if __name__ == "__main__":
     ema = ExponentialMovingAverage(model.parameters(), decay=config.training.ema)
     if args.use_saved:   
         ema.load_state_dict(torch.load(args.saved_model)["ema_state_dict"])
-        validation_losses = [torch.load(args.saved_model)["validation_loss"]]
-        print(f"DBG: Validation loss at which the loaded model was saved: {validation_losses[0]:.5f}")
+        # validation_losses = [torch.load(args.saved_model)["validation_loss"]]
+        # print(f"DBG: Validation loss at which the loaded model was saved: {validation_losses[0]:.5f}")
 
     else:
         validation_losses = []
@@ -330,7 +328,6 @@ if __name__ == "__main__":
     # Load datasets
     train_loader, validation_loader = load_dataset(path_to_train_data=args.path_to_train_data, 
                                                    path_to_val_data=args.path_to_val_data,
-                                                   path_to_test_data=args.path_to_test_data,
                                                    path_to_mdpdbs=args.path_to_mdpdbs, 
                                                    model_type=args.model, 
                                                    batch_size=config.training.batch_size)
